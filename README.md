@@ -2,7 +2,7 @@
 
 A Python script that patches **Super Mario Bros. (NES)** to remove all pits and holes, making the game more accessible for special needs players.
 
-Changes 4 bytes in the ROM. The original file is not modified.
+Changes 4 bytes and replaces one 59-byte routine in the ROM. The original file is not modified.
 
 ## Usage
 
@@ -22,10 +22,13 @@ Pits in SMB1 are created through three independent mechanisms. This patch neutra
 | 2 | `$1401` | `$00`->`$18` | Terrain pattern "ceiling only" now includes floor |
 | 3 | `$1B51` | `$20`->`$60` | `Hole_Empty` routine returns immediately (ground never carved out) |
 | 4 | `$1967` | `$20`->`$60` | `Hole_Water` routine returns immediately (water pits removed) |
+| 5 | `$318F` | 59 bytes | `PlayerHole` death routine replaced with position reset |
 
 **Patches 1-2** ensure the base terrain always includes ground tiles, even when level data or mid-level commands set the floor pattern to "empty."
 
 **Patches 3-4** prevent hole objects from removing ground tiles. The `Hole_Empty` and `Hole_Water` 6502 subroutines have their first instruction changed from `JSR` (call subroutine) to `RTS` (return immediately), so they do nothing.
+
+**Patch 5** replaces the pit death routine with a position reset. If Mario somehow falls below the screen (e.g. pushed through the floor by a moving platform), instead of dying he reappears mid-screen and falls back to the ground. The 59-byte death routine is replaced with 22 bytes of new 6502 code that resets `Player_Y_HighPos`, `Player_Y_Position`, `Player_Y_Speed`, `Player_Y_MoveForce`, and `Player_State`.
 
 ## How It Works
 

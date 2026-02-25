@@ -2,12 +2,13 @@
 Super Mario Bros. (NES) - Accessibility Pit Removal Patch
 
 Removes all pits/holes from the game to make it accessible for special needs players.
-Applies 4 patches (4 bytes changed) to the ROM:
+Applies 5 patches to the ROM:
 
 1. TerrainRenderBits pattern 0: "no floor" -> "2-row floor" (visual floor everywhere)
 2. TerrainRenderBits pattern 10: "ceiling only, no floor" -> "ceiling + floor"
 3. Hole_Empty subroutine: RTS immediately (holes never remove ground tiles)
 4. Hole_Water subroutine: RTS immediately (water holes never remove ground)
+5. PlayerHole death -> position reset (if Mario falls, reappear mid-screen instead of dying)
 
 Usage:
     python patch_remove_pits.py "Super Mario Bros. (World).nes"
@@ -169,12 +170,50 @@ def main():
         patches_failed += 1
 
     # ================================================================
+    # PATCH 5: PlayerHole - position reset instead of death
+    # ================================================================
+    print()
+    print("--- Patch 5: PlayerHole death -> position reset ---")
+    # At $3189: LDA Player_Y_HighPos, CMP #$02, BMI ExitCtrl
+    # The death code runs from $318F to $31C9 (59 bytes) when Mario falls below screen.
+    # Replace it with code that resets Mario's position to mid-screen and lets him
+    # fall back to the ground, instead of killing him.
+    #
+    # RAM addresses (confirmed from disassembly cross-references):
+    #   $B5   = Player_Y_HighPos    (vertical screen page)
+    #   $CE   = Player_Y_Position   (vertical position low byte)
+    #   $9F   = Player_Y_Speed      (vertical velocity)
+    #   $0433 = Player_Y_MoveForce  (sub-pixel vertical accumulator)
+    #   $1D   = Player_State        (0=ground, 1=jump, 2=falling, 3=climbing)
+    #   ExitCtrl = CPU $B1BA        (RTS at file offset $31CA)
+    if verify_context(data, 0x318F, bytes([0xA2, 0x01, 0x8E, 0x23, 0x07]),
+                       "PlayerHole death code: LDX #$01, STX ScrollLock"):
+        new_code = bytes([
+            0xA9, 0x01,             # LDA #$01
+            0x85, 0xB5,             # STA Player_Y_HighPos     (back on screen)
+            0xA9, 0x80,             # LDA #$80
+            0x85, 0xCE,             # STA Player_Y_Position    (mid-screen)
+            0xA9, 0x00,             # LDA #$00
+            0x85, 0x9F,             # STA Player_Y_Speed       (zero velocity)
+            0x8D, 0x33, 0x04,       # STA Player_Y_MoveForce   (zero sub-pixel)
+            0xA9, 0x02,             # LDA #$02
+            0x85, 0x1D,             # STA Player_State         (set to falling)
+            0x4C, 0xBA, 0xB1,       # JMP ExitCtrl             (resume gameplay)
+        ])
+        nop_fill = bytes([0xEA] * (59 - len(new_code)))
+        data = data[:0x318F] + new_code + nop_fill + data[0x31CA:]
+        print(f"  OK: $318F-$31C9: replaced 59-byte death routine with position reset")
+        patches_applied += 1
+    else:
+        patches_failed += 1
+
+    # ================================================================
     # Summary and write output
     # ================================================================
     print()
     print("=" * 60)
-    print(f"Patches applied: {patches_applied}/4")
-    print(f"Patches failed:  {patches_failed}/4")
+    print(f"Patches applied: {patches_applied}/5")
+    print(f"Patches failed:  {patches_failed}/5")
 
     if patches_applied == 0:
         print("ERROR: No patches were applied! ROM may be incompatible.")
@@ -197,6 +236,7 @@ def main():
     print("  - Ground/floor is always present (no gaps in terrain)")
     print("  - Hole objects in level data are ignored (pits never carved out)")
     print("  - Water holes are also ignored")
+    print("  - Falling below the screen resets Mario to mid-screen (no death)")
     print()
     print("Done! The patched ROM is ready to play.")
 
