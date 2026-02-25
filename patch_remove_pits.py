@@ -2,7 +2,7 @@
 Super Mario Bros. (NES) - Accessibility Pit Removal Patch
 
 Removes all pits/holes from the game to make it accessible for special needs players.
-Applies 7 patches and 4 Game Genie codes to the ROM:
+Applies 8 patches and 4 Game Genie codes to the ROM:
 
 1. TerrainRenderBits pattern 0: "no floor" -> "2-row floor" (visual floor everywhere)
 2. TerrainRenderBits pattern 10: "ceiling only, no floor" -> "ceiling + floor"
@@ -11,6 +11,7 @@ Applies 7 patches and 4 Game Genie codes to the ROM:
 5. PlayerHole death -> position reset (if Mario falls, reappear mid-screen instead of dying)
 6. Timer freeze: NOP the timer digit decrement (timer stays at starting value)
 7. Springboard always boosts: default force changed from $F9 to $F4 (max bounce every time)
+8. Castle maze loops disabled: NOP the LoopCommand flag so 4-4, 7-4, 8-4 never loop
 
 Game Genie codes baked in:
 - POAISA: Power up on enemies (touching enemies powers you up instead of hurting you)
@@ -296,6 +297,24 @@ def main():
         patches_failed += 1
 
     # ================================================================
+    # PATCH 8: Castle maze loops disabled
+    # ================================================================
+    print()
+    print("--- Patch 8: Castle maze loops disabled ---")
+    # In the area object parser (CPU $95DA), when a loop-command object is found,
+    # INC $0745 sets the LoopCommand flag. ProcLoopCommand (CPU $C0CC) then checks
+    # Mario's Y-position each frame and loops the level back if he's on the wrong path.
+    # NOP the INC so the flag is never set — castles 4-4, 7-4, 8-4 play straight through.
+    # Context: CMP #$4B ($C9 $4B), BNE +3 ($D0 $03), INC $0745 ($EE $45 $07)
+    if verify_context(data, 0x15E6, bytes([0xC9, 0x4B, 0xD0, 0x03, 0xEE, 0x45, 0x07]),
+                       "LoopCommand: CMP #$4B, BNE +3, INC $0745"):
+        data = data[:0x15EA] + bytes([0xEA, 0xEA, 0xEA]) + data[0x15ED:]
+        print(f"  OK: $15EA-$15EC: $EE $45 $07 -> $EA $EA $EA  (INC LoopCommand -> NOP NOP NOP)")
+        patches_applied += 1
+    else:
+        patches_failed += 1
+
+    # ================================================================
     # GAME GENIE CODES
     # ================================================================
     print()
@@ -312,8 +331,8 @@ def main():
     # ================================================================
     print()
     print("=" * 60)
-    print(f"Patches applied: {patches_applied}/7")
-    print(f"Patches failed:  {patches_failed}/7")
+    print(f"Patches applied: {patches_applied}/8")
+    print(f"Patches failed:  {patches_failed}/8")
     print(f"Game Genie codes: {gg_applied}/4")
 
     if patches_applied == 0:
@@ -340,6 +359,7 @@ def main():
     print("  - Falling below the screen resets Mario to mid-screen (no death)")
     print("  - Timer is frozen (no time pressure)")
     print("  - Springboard always gives max boost (no precise timing needed)")
+    print("  - Castle maze loops disabled (4-4, 7-4, 8-4 play straight through)")
     print("  - Touching enemies powers you up (POAISA)")
     print("  - Mario always stays big (OZTLLX + AATLGZ + SZLIVO)")
     print()
