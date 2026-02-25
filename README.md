@@ -24,6 +24,7 @@ Pits in SMB1 are created through three independent mechanisms. This patch neutra
 | 4 | `$1967` | `$20`->`$60` | `Hole_Water` routine returns immediately (water pits removed) |
 | 5 | `$318F` | 59 bytes | `PlayerHole` death routine replaced with position reset |
 | 6 | `$379F` | 3 bytes NOP | Timer digit decrement removed (timer frozen) |
+| 7 | `$5EDF` | `$F9`->`$F4` | Springboard default force changed to max boost |
 
 **Patches 1-2** ensure the base terrain always includes ground tiles, even when level data or mid-level commands set the floor pattern to "empty."
 
@@ -32,6 +33,8 @@ Pits in SMB1 are created through three independent mechanisms. This patch neutra
 **Patch 5** replaces the pit death routine with a position reset. If Mario somehow falls below the screen (e.g. pushed through the floor by a moving platform), instead of dying he reappears mid-screen and falls back to the ground. The 59-byte death routine is replaced with 22 bytes of new 6502 code that resets `Player_Y_HighPos`, `Player_Y_Position`, `Player_Y_Speed`, `Player_Y_MoveForce`, and `Player_State`.
 
 **Patch 6** freezes the level timer by NOPing the `STA DigitModifier+5` instruction in `RunGameTimer`. This removes the -1 that the timer routine feeds into `DigitsMathRoutine` each tick, so the timer display never changes. Scores and coin counts are unaffected because `DigitsMathRoutine` itself is not modified.
+
+**Patch 7** makes the springboard always give the maximum boost jump. Normally, `ChkForLandJumpSpring` initializes `JumpspringForce` to `$F9` (low bounce), and the player must press A with precise timing during the spring animation to upgrade it to `$F4` (high bounce). This patch changes the default to `$F4`, so every springboard bounce is a full boost regardless of button timing.
 
 ## Game Genie Codes
 
@@ -62,7 +65,7 @@ Tested with `Super Mario Bros. (World).nes`. Other regional variants (Japan, Eur
 ## Roadmap
 
 - ~~**Stop timer**: Freeze the level timer so there's no time pressure~~ Done (Patch 6)
-- **Springboard always boosts**: Make the trampoline/springboard always give a full boost jump instead of requiring precise timing
+- ~~**Springboard always boosts**: Make the trampoline/springboard always give a full boost jump instead of requiring precise timing~~ Done (Patch 7)
 
 ## References
 

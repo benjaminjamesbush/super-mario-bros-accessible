@@ -2,7 +2,7 @@
 Super Mario Bros. (NES) - Accessibility Pit Removal Patch
 
 Removes all pits/holes from the game to make it accessible for special needs players.
-Applies 6 patches and 4 Game Genie codes to the ROM:
+Applies 7 patches and 4 Game Genie codes to the ROM:
 
 1. TerrainRenderBits pattern 0: "no floor" -> "2-row floor" (visual floor everywhere)
 2. TerrainRenderBits pattern 10: "ceiling only, no floor" -> "ceiling + floor"
@@ -10,6 +10,7 @@ Applies 6 patches and 4 Game Genie codes to the ROM:
 4. Hole_Water subroutine: RTS immediately (water holes never remove ground)
 5. PlayerHole death -> position reset (if Mario falls, reappear mid-screen instead of dying)
 6. Timer freeze: NOP the timer digit decrement (timer stays at starting value)
+7. Springboard always boosts: default force changed from $F9 to $F4 (max bounce every time)
 
 Game Genie codes baked in:
 - POAISA: Power up on enemies (touching enemies powers you up instead of hurting you)
@@ -274,6 +275,27 @@ def main():
         patches_failed += 1
 
     # ================================================================
+    # PATCH 7: Springboard always gives max boost
+    # ================================================================
+    print()
+    print("--- Patch 7: Springboard always max boost ---")
+    # In ChkForLandJumpSpring (CPU $DEC4), when Mario lands on the springboard,
+    # JumpspringForce is initialized to $F9 (low bounce). The player must press A
+    # with precise timing during the animation to upgrade it to $F4 (high bounce).
+    # Change the default from $F9 to $F4 so the max boost always happens.
+    # Context: LDA #$70, STA $0709, LDA #$F9, STA $06DB
+    if verify_context(data, 0x5ED9, bytes([0xA9, 0x70, 0x8D, 0x09, 0x07, 0xA9, 0xF9, 0x8D, 0xDB, 0x06]),
+                       "ChkForLandJumpSpring: LDA #$70, STA VerticalForce, LDA #$F9, STA JumpspringForce"):
+        data, ok = apply_patch(data, 0x5EDF, 0xF9, 0xF4,
+                               "JumpspringForce default: $F9 (low bounce) -> $F4 (always max bounce)")
+        if ok:
+            patches_applied += 1
+        else:
+            patches_failed += 1
+    else:
+        patches_failed += 1
+
+    # ================================================================
     # GAME GENIE CODES
     # ================================================================
     print()
@@ -290,8 +312,8 @@ def main():
     # ================================================================
     print()
     print("=" * 60)
-    print(f"Patches applied: {patches_applied}/6")
-    print(f"Patches failed:  {patches_failed}/6")
+    print(f"Patches applied: {patches_applied}/7")
+    print(f"Patches failed:  {patches_failed}/7")
     print(f"Game Genie codes: {gg_applied}/4")
 
     if patches_applied == 0:
@@ -317,6 +339,7 @@ def main():
     print("  - Water holes are also ignored")
     print("  - Falling below the screen resets Mario to mid-screen (no death)")
     print("  - Timer is frozen (no time pressure)")
+    print("  - Springboard always gives max boost (no precise timing needed)")
     print("  - Touching enemies powers you up (POAISA)")
     print("  - Mario always stays big (OZTLLX + AATLGZ + SZLIVO)")
     print()
