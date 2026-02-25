@@ -2,13 +2,18 @@
 Super Mario Bros. (NES) - Accessibility Pit Removal Patch
 
 Removes all pits/holes from the game to make it accessible for special needs players.
-Applies 5 patches to the ROM:
+Applies 6 patches and 4 Game Genie codes to the ROM:
 
 1. TerrainRenderBits pattern 0: "no floor" -> "2-row floor" (visual floor everywhere)
 2. TerrainRenderBits pattern 10: "ceiling only, no floor" -> "ceiling + floor"
 3. Hole_Empty subroutine: RTS immediately (holes never remove ground tiles)
 4. Hole_Water subroutine: RTS immediately (water holes never remove ground)
 5. PlayerHole death -> position reset (if Mario falls, reappear mid-screen instead of dying)
+6. Timer freeze: NOP the timer digit decrement (timer stays at starting value)
+
+Game Genie codes baked in:
+- POAISA: Power up on enemies (touching enemies powers you up instead of hurting you)
+- OZTLLX + AATLGZ + SZLIVO: Always stay big (never revert to small Mario)
 
 Usage:
     python patch_remove_pits.py "Super Mario Bros. (World).nes"
@@ -20,6 +25,48 @@ The original ROM is not modified.
 import sys
 import os
 import hashlib
+
+
+GG_LETTERS = "APZLGITYEOXUKSVN"
+
+
+def decode_game_genie(code):
+    """Decode a 6-letter NES Game Genie code into (cpu_address, value)."""
+    code = code.upper()
+    if len(code) != 6:
+        raise ValueError(f"Expected 6-letter code, got {len(code)}: {code}")
+    n = []
+    for ch in code:
+        idx = GG_LETTERS.find(ch)
+        if idx < 0:
+            raise ValueError(f"Invalid Game Genie letter '{ch}' in {code}")
+        n.append(idx)
+    address = (0x8000
+               | ((n[3] & 7) << 12)
+               | ((n[5] & 7) << 8)
+               | ((n[4] & 8) << 8)
+               | ((n[2] & 7) << 4)
+               | ((n[1] & 8) << 4)
+               | (n[4] & 7)
+               | (n[3] & 8))
+    value = ((n[1] & 7) << 4) | ((n[0] & 8) << 4) | (n[0] & 7) | (n[5] & 8)
+    return address, value
+
+
+def cpu_to_file(cpu_addr):
+    """Convert a CPU address ($8000-$FFFF) to iNES file offset."""
+    return cpu_addr - 0x8000 + 0x10
+
+
+def apply_game_genie(data, code, description):
+    """Decode and apply a Game Genie code to the ROM data."""
+    cpu_addr, value = decode_game_genie(code)
+    file_offset = cpu_to_file(cpu_addr)
+    old_byte = data[file_offset]
+    print(f"  {code}: CPU ${cpu_addr:04X} -> file ${file_offset:04X},"
+          f" ${old_byte:02X} -> ${value:02X}  ({description})")
+    data = data[:file_offset] + bytes([value]) + data[file_offset + 1:]
+    return data
 
 
 def verify_rom(data):
@@ -208,12 +255,44 @@ def main():
         patches_failed += 1
 
     # ================================================================
+    # PATCH 6: Timer freeze - NOP the digit decrement
+    # ================================================================
+    print()
+    print("--- Patch 6: Timer freeze (NOP digit decrement) ---")
+    # In RunGameTimer (CPU $B74F), the timer is decremented by storing $FF (-1)
+    # into DigitModifier+5 at CPU $B78F: STA $0139 (bytes: $8D $39 $01)
+    # NOP these 3 bytes so the timer digit modifier is never set, freezing the timer.
+    # This does NOT affect DigitsMathRoutine (shared by scores/coins) — only the
+    # timer's -1 input is removed. The timer display still refreshes harmlessly.
+    # Context: LDA #$FF ($A9 $FF) before, JSR DigitsMathRoutine ($20 $5F $8F) after
+    if verify_context(data, 0x379D, bytes([0xA9, 0xFF, 0x8D, 0x39, 0x01, 0x20, 0x5F, 0x8F]),
+                       "RunGameTimer: LDA #$FF, STA DigitModifier+5, JSR DigitsMathRoutine"):
+        data = data[:0x379F] + bytes([0xEA, 0xEA, 0xEA]) + data[0x37A2:]
+        print(f"  OK: $379F-$37A1: $8D $39 $01 -> $EA $EA $EA  (STA DigitModifier+5 -> NOP NOP NOP)")
+        patches_applied += 1
+    else:
+        patches_failed += 1
+
+    # ================================================================
+    # GAME GENIE CODES
+    # ================================================================
+    print()
+    print("--- Game Genie codes ---")
+    data = apply_game_genie(data, "POAISA", "Power up on enemies")
+    data = apply_game_genie(data, "OZTLLX", "Always stay big (1/3)")
+    data = apply_game_genie(data, "AATLGZ", "Always stay big (2/3)")
+    data = apply_game_genie(data, "SZLIVO", "Always stay big (3/3)")
+    gg_applied = 4
+    print(f"  Applied {gg_applied} Game Genie codes")
+
+    # ================================================================
     # Summary and write output
     # ================================================================
     print()
     print("=" * 60)
-    print(f"Patches applied: {patches_applied}/5")
-    print(f"Patches failed:  {patches_failed}/5")
+    print(f"Patches applied: {patches_applied}/6")
+    print(f"Patches failed:  {patches_failed}/6")
+    print(f"Game Genie codes: {gg_applied}/4")
 
     if patches_applied == 0:
         print("ERROR: No patches were applied! ROM may be incompatible.")
@@ -237,6 +316,9 @@ def main():
     print("  - Hole objects in level data are ignored (pits never carved out)")
     print("  - Water holes are also ignored")
     print("  - Falling below the screen resets Mario to mid-screen (no death)")
+    print("  - Timer is frozen (no time pressure)")
+    print("  - Touching enemies powers you up (POAISA)")
+    print("  - Mario always stays big (OZTLLX + AATLGZ + SZLIVO)")
     print()
     print("Done! The patched ROM is ready to play.")
 
