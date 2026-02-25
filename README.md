@@ -25,7 +25,7 @@ Pits in SMB1 are created through three independent mechanisms. This patch neutra
 | 5 | `$318F` | 59 bytes | `PlayerHole` death routine replaced with position reset |
 | 6 | `$379F` | 3 bytes NOP | Timer digit decrement removed (timer frozen) |
 | 7 | `$5EDF` | `$F9`->`$F4` | Springboard default force changed to max boost |
-| 8 | `$15EA` | 3 bytes NOP | Castle maze `LoopCommand` flag never set (4-4, 7-4, 8-4) |
+| 8 | `$40FB` | 13 bytes | Castle maze Y-check replaced with auto-correct (4-4, 7-4, 8-4) |
 
 **Patches 1-2** ensure the base terrain always includes ground tiles, even when level data or mid-level commands set the floor pattern to "empty."
 
@@ -37,7 +37,7 @@ Pits in SMB1 are created through three independent mechanisms. This patch neutra
 
 **Patch 7** makes the springboard always give the maximum boost jump. Normally, `ChkForLandJumpSpring` initializes `JumpspringForce` to `$F9` (low bounce), and the player must press A with precise timing during the spring animation to upgrade it to `$F4` (high bounce). This patch changes the default to `$F4`, so every springboard bounce is a full boost regardless of button timing.
 
-**Patch 8** disables the castle maze loops in worlds 4-4, 7-4, and 8-4. These levels contain hidden loop-command objects that set a `LoopCommand` flag (`$0745`). Each frame, `ProcLoopCommand` checks if Mario is at the correct Y-position — wrong position rewinds the level by 4 pages, trapping the player in an infinite loop. NOPing the `INC $0745` instruction prevents the flag from ever being set, so all castle levels play straight through.
+**Patch 8** solves the castle maze puzzle in worlds 4-4, 7-4, and 8-4. These levels have branching paths where only one path continues forward — the others dead-end into walls, and the game was designed to loop you back to try again. Instead of checking Mario's Y-position against a lookup table, this patch *sets* Mario's position to the correct value from that same table. At each maze checkpoint, Mario is automatically teleported to the correct path, so the level always advances regardless of which path the player chose.
 
 ## Game Genie Codes
 

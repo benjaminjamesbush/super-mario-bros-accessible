@@ -11,7 +11,7 @@ Applies 8 patches and 4 Game Genie codes to the ROM:
 5. PlayerHole death -> position reset (if Mario falls, reappear mid-screen instead of dying)
 6. Timer freeze: NOP the timer digit decrement (timer stays at starting value)
 7. Springboard always boosts: default force changed from $F9 to $F4 (max bounce every time)
-8. Castle maze loops disabled: NOP the LoopCommand flag so 4-4, 7-4, 8-4 never loop
+8. Castle maze auto-correct: teleport Mario to the correct path at each checkpoint (4-4, 7-4, 8-4)
 
 Game Genie codes baked in:
 - POAISA: Power up on enemies (touching enemies powers you up instead of hurting you)
@@ -297,19 +297,49 @@ def main():
         patches_failed += 1
 
     # ================================================================
-    # PATCH 8: Castle maze loops disabled
+    # PATCH 8: Castle maze auto-correct
     # ================================================================
     print()
-    print("--- Patch 8: Castle maze loops disabled ---")
-    # In the area object parser (CPU $95DA), when a loop-command object is found,
-    # INC $0745 sets the LoopCommand flag. ProcLoopCommand (CPU $C0CC) then checks
-    # Mario's Y-position each frame and loops the level back if he's on the wrong path.
-    # NOP the INC so the flag is never set — castles 4-4, 7-4, 8-4 play straight through.
-    # Context: CMP #$4B ($C9 $4B), BNE +3 ($D0 $03), INC $0745 ($EE $45 $07)
-    if verify_context(data, 0x15E6, bytes([0xC9, 0x4B, 0xD0, 0x03, 0xEE, 0x45, 0x07]),
-                       "LoopCommand: CMP #$4B, BNE +3, INC $0745"):
-        data = data[:0x15EA] + bytes([0xEA, 0xEA, 0xEA]) + data[0x15ED:]
-        print(f"  OK: $15EA-$15EC: $EE $45 $07 -> $EA $EA $EA  (INC LoopCommand -> NOP NOP NOP)")
+    print("--- Patch 8: Castle maze auto-correct ---")
+    # In ProcLoopCommand (CPU $C0CC), castle levels 4-4, 7-4, 8-4 check if Mario
+    # is at the correct Y-position at certain page boundaries. Wrong position loops
+    # the level back, creating a maze puzzle. This is inaccessible for cognitively
+    # impaired players, AND simply disabling the loop causes soft-locks (dead-end paths).
+    #
+    # Fix: replace the Y-position CHECK with a Y-position SET. Instead of comparing
+    # Mario's position to the required value, we MOVE Mario to the correct position.
+    # This ensures Mario is always on the right path at every checkpoint.
+    #
+    # Original 13 bytes at CPU $C0EB (file $40FB):
+    #   A5 CE       LDA Player_Y_Position
+    #   D9 81 C0    CMP $C081,Y           (required Y from table)
+    #   D0 23       BNE WrongChk
+    #   A5 1D       LDA Player_State
+    #   C9 00       CMP #$00
+    #   D0 1D       BNE WrongChk
+    #
+    # New 13 bytes:
+    #   B9 81 C0    LDA $C081,Y           (load correct Y from table)
+    #   85 CE       STA Player_Y_Position (teleport Mario to correct path)
+    #   A9 00       LDA #$00
+    #   85 9F       STA Player_Y_Speed    (zero vertical velocity)
+    #   85 1D       STA Player_State      (set to on-ground)
+    #   EA EA       NOP NOP               (pad to 13 bytes)
+    original = bytes([0xA5, 0xCE, 0xD9, 0x81, 0xC0, 0xD0, 0x23,
+                      0xA5, 0x1D, 0xC9, 0x00, 0xD0, 0x1D])
+    if verify_context(data, 0x40FB, original,
+                       "ProcLoopCommand: Y-position check + Player_State check"):
+        new_code = bytes([
+            0xB9, 0x81, 0xC0,   # LDA $C081,Y  (correct Y from table)
+            0x85, 0xCE,         # STA Player_Y_Position
+            0xA9, 0x00,         # LDA #$00
+            0x85, 0x9F,         # STA Player_Y_Speed
+            0x85, 0x1D,         # STA Player_State (on ground)
+            0xEA, 0xEA,         # NOP NOP
+        ])
+        data = data[:0x40FB] + new_code + data[0x4108:]
+        print(f"  OK: $40FB-$4107: replaced Y-position check with auto-correct")
+        print(f"       Mario is teleported to the correct path at each checkpoint")
         patches_applied += 1
     else:
         patches_failed += 1
@@ -359,7 +389,7 @@ def main():
     print("  - Falling below the screen resets Mario to mid-screen (no death)")
     print("  - Timer is frozen (no time pressure)")
     print("  - Springboard always gives max boost (no precise timing needed)")
-    print("  - Castle maze loops disabled (4-4, 7-4, 8-4 play straight through)")
+    print("  - Castle mazes auto-corrected (Mario teleported to correct path in 4-4, 7-4, 8-4)")
     print("  - Touching enemies powers you up (POAISA)")
     print("  - Mario always stays big (OZTLLX + AATLGZ + SZLIVO)")
     print()
