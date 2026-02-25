@@ -1,0 +1,3 @@
+*.nes
+__pycache__/
+*.pyc
