@@ -160,15 +160,17 @@ def main():
     # able to fall through the bottom to exit coin heaven. When HighPos >= 2 in a
     # cloud area, we JMP to the original CloudExit routine.
     #
-    # During i-frames (InjuryTimer != 0), velocity is zeroed instead of boosting,
-    # to prevent clipping through bricks while collision is disabled.
+    # During i-frames (InjuryTimer != 0), both vertical and horizontal velocity
+    # are zeroed instead of boosting. This prevents clipping through bricks
+    # (vertical from boost, horizontal from walking through pit walls) while
+    # tile collision is disabled.
     #
     # CPU addresses (file offset = CPU - $8000 + $10):
     #   Code start:  CPU $B179 = file $3189
-    #   boost:       CPU $B19C = file $31AC
+    #   boost:       CPU $B19F = file $31AF
     #   deep_fall:   CPU $B1A9 = file $31B9
-    #   df_normal:   CPU $B1B1 = file $31C1
-    #   hold:        CPU $B1B8 = file $31C8
+    #   df_normal:   CPU $B1AE = file $31BE
+    #   hold:        CPU $B1B5 = file $31C5
     #   ExitCtrl:    CPU $B1BA = file $31CA (original RTS, untouched)
     #   CloudExit:   CPU $B1BB = file $31CB (original routine, untouched)
     if verify_context(data, 0x3189, bytes([0xA5, 0xB5, 0xC9, 0x02, 0x30, 0x3B, 0xA2, 0x01]),
@@ -193,12 +195,13 @@ def main():
             0xA5, 0xCE,             # LDA Player_Y_Position
             0xC9, 0xC0,             # CMP #$C0
             0x90, 0x25,             # BCC ExitCtrl             (above $C0 -> $B1BA)
-            # --- chk_injury: if i-frames active, hold instead of boost ---
-            0xA2, 0x00,             # LDX #$00                 (X=0 for STX later)
-            0xAD, 0x9E, 0x07,       # LDA InjuryTimer          ($079E)
-            0xD0, 0x1C,             # BNE hold                 (i-frames active -> $B1B8)
-            # --- boost: zero sub-pixel, set velocity, fix gravity ---
+            # --- Zero sub-pixel before injury check (shared by boost and hold) ---
+            0xA2, 0x00,             # LDX #$00                 (X=0 for STX ops)
             0x8E, 0x33, 0x04,       # STX Player_Y_MoveForce   ($0433, X=0)
+            # --- chk_injury: if i-frames active, hold instead of boost ---
+            0xAD, 0x9E, 0x07,       # LDA InjuryTimer          ($079E)
+            0xD0, 0x16,             # BNE hold                 (i-frames active -> $B1B5)
+            # --- boost: set velocity, fix gravity ---
             0xA9, 0xF4,             # LDA #$F4                 (springboard velocity)
             0x85, 0x9F,             # STA Player_Y_Speed
             0xA9, 0x70,             # LDA #$70                 (jump gravity)
@@ -206,16 +209,16 @@ def main():
             0x60,                   # RTS
             # --- deep_fall: HighPos >= 2 ---
             0xAD, 0x43, 0x07,       # LDA CloudTypeOverride    ($0743)
-            0xF0, 0x03,             # BEQ df_normal            (not cloud -> $B1B1)
-            0x4C, 0xBB, 0xB1,       # JMP CloudExit            ($B1BB)
+            0xD0, 0x0D,             # BNE CloudExit            (cloud area -> $B1BB)
             # --- df_normal: reset to play area, zero velocity, return ---
             0x85, 0x9F,             # STA Player_Y_Speed       (A=0, zero velocity)
             0xA9, 0x01,             # LDA #$01
             0x85, 0xB5,             # STA Player_Y_HighPos     (back to page 1)
             0x60,                   # RTS
-            # --- hold: i-frames active, zero velocity ---
-            0x86, 0x9F,             # STX Player_Y_Speed       (X=0)
-            # falls through to ExitCtrl RTS at $B1BA
+            # --- hold: i-frames active, freeze Mario in place ---
+            0x86, 0x9F,             # STX Player_Y_Speed       (X=0, stop vertical)
+            0x86, 0x57,             # STX Player_X_Speed       (X=0, stop horizontal)
+            0xEA,                   # NOP (pad; falls through to ExitCtrl RTS)
         ])
         nop_fill = bytes([0xEA] * (65 - len(new_code)))
         data = data[:0x3189] + new_code + nop_fill + data[0x31CA:]
