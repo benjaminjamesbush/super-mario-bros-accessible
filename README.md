@@ -1,8 +1,8 @@
-# SMB1 Accessibility Patch
+# 🍄 SMB1 Accessibility Patch
 
 A Python script that patches **Super Mario Bros. (NES)** to make the game more accessible for special needs players. Bounces Mario out of pits instead of dying, freezes the timer, auto-solves castle mazes, and bakes in Game Genie codes for power-up-on-enemies and always-stay-big.
 
-## Why This Exists
+## ❤️ Why This Exists
 
 Super Mario Bros. is one of the best games to hand to a first-time player with intellectual disabilities. The controls are a d-pad and two buttons. The levels go left to right. The visual language is clear — coins are good, pipes go somewhere, the flag at the end means you made it. It runs on inexpensive retro handhelds, and nearly everyone recognizes it.
 
@@ -14,7 +14,7 @@ This patch removes those frustrations. Mario bounces out of pits instead of dyin
 
 Pairing the patched ROM with a device that has arcade-style controls — like the Powkiddy A13 — can further increase accessibility for players with fine motor control challenges. A full-sized joystick and large buttons are easier to use than a small d-pad and tiny face buttons.
 
-## Usage
+## 🕹️ Usage
 
 ```
 python patch_smb1_accessible.py "Super Mario Bros. (World).nes"
@@ -22,7 +22,7 @@ python patch_smb1_accessible.py "Super Mario Bros. (World).nes"
 
 Outputs a patched ROM with `- Accessible` appended to the filename. The original file is not modified.
 
-## What It Does
+## 🔧 What It Does
 
 | Patch | Offset | Size | Effect |
 |-------|--------|------|--------|
@@ -45,7 +45,7 @@ Outputs a patched ROM with `- Accessible` appended to the filename. The original
 
 **Patch 4: Castle maze auto-correct.** Worlds 4-4, 7-4, and 8-4 have branching paths where only one continues forward. Instead of checking Mario's Y-position against a lookup table, this patch loads the table value and checks if it's safe (< $C0). For 4-4 and 7-4 (table values $40/$80/$B0), Mario is teleported to the correct corridor. For 8-4 (table values $F0, which are below the floor), the teleport is skipped — the maze check still passes (no loopback), but Mario stays at his natural position.
 
-## Game Genie Codes
+## 🧞 Game Genie Codes
 
 The script also bakes in four Game Genie codes, decoded and applied directly to the ROM:
 
@@ -58,7 +58,7 @@ The script also bakes in four Game Genie codes, decoded and applied directly to 
 
 Power-up-on-enemies alone doesn't make Mario invincible — fire bars and hammers still injure him. The OZTLLX + AATLGZ + SZLIVO combination prevents Mario from reverting to small form when hit, so the two codes together make him effectively invincible.
 
-## How It Works
+## ⚙️ How It Works
 
 Each patch is verified before application — the script checks surrounding bytes to confirm it found the correct location. If a context check fails, that patch is skipped with a warning.
 
@@ -67,28 +67,28 @@ The script validates:
 - ROM size (40,976 bytes: 16-byte header + 32KB PRG + 8KB CHR)
 - PRG/CHR bank counts (2 PRG, 1 CHR = NROM mapper)
 
-## Compatibility
+## ✅ Compatibility
 
 Tested with `Super Mario Bros. (World).nes`. Other regional variants (Japan, Europe) may have different byte offsets — the context verification will catch any mismatch.
 
-## References
+## 📚 References
 
 - [SMB1 Disassembly (doppelganger)](https://gist.github.com/1wErt3r/4048722)
 - [SMB1 Disassembly (Xkeeper0)](https://github.com/Xkeeper0/smb1)
 - [Super Mario Bros. ROM Map - Data Crystal](https://datacrystal.tcrf.net/wiki/Super_Mario_Bros.:ROM_map)
 
-## Contact
+## 📬 Contact
 
 If you have concerns, questions, or want to discuss anything related to accessibility and gaming, reach out directly at benjaminjamesbush@gmail.com.
 
-## Disclaimer
+## ⚖️ Disclaimer
 
 This project is not affiliated with or endorsed by Nintendo. Super Mario Bros. is a trademark of Nintendo. No copyrighted material is distributed — the patch script modifies a ROM image that the user must supply.
 
-## Acknowledgements
+## 🤝 Acknowledgements
 
 This patch was developed in collaboration with [Claude Code](https://claude.ai/claude-code).
 
-## License
+## 📄 License
 
 [Unlicense](https://unlicense.org/) — public domain.
