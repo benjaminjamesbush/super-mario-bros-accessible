@@ -148,68 +148,73 @@ def main():
     print("--- Patch 1: Pit survival (early Y-floor with upward boost) ---")
     # REPLACES the 6-byte death check ($3189) AND the 59-byte death routine ($318F)
     # with 65 bytes of new code ($3189-$31C9). ExitCtrl RTS at $31CA is untouched.
+    # CloudExit at $B1BB ($31CB) is also untouched and used for coin heaven exits.
     #
-    # The original code waited until Mario was a full screen below visible (HighPos >= 2)
-    # before triggering. By then, Mario had drifted horizontally out of the pit's open
-    # air column, causing the boost to clip through adjacent ground/bricks.
+    # When Mario is falling (State==2) in the normal play area (HighPos==1) and his
+    # Y position >= $C0, apply springboard upward velocity with jump gravity. This
+    # catches pit falls early while Mario is still in the pit's air column.
     #
-    # New approach: enforce a Y-floor EVERY FRAME. When Mario is falling and his Y
-    # position exceeds $E0 (just below ground level), immediately give him springboard
-    # upward velocity. At this point Mario is still directly under the pit opening,
-    # so the upward path is clear air — no clipping.
+    # Cloud/coin heaven areas (CloudTypeOverride != 0) are excluded — Mario must be
+    # able to fall through the bottom to exit coin heaven. When HighPos >= 2 in a
+    # cloud area, we JMP to the original CloudExit routine.
     #
-    # A backup deep-fall handler catches HighPos >= 2 in case the early check misses.
+    # During i-frames (InjuryTimer != 0), velocity is zeroed instead of boosting,
+    # to prevent clipping through bricks while collision is disabled.
     #
     # CPU addresses (file offset = CPU - $8000 + $10):
     #   Code start:  CPU $B179 = file $3189
-    #   boost:       CPU $B18F = file $319F
-    #   deep_fall:   CPU $B196 = file $31A6
+    #   boost:       CPU $B19A = file $31AA
+    #   deep_fall:   CPU $B1A9 = file $31B9
+    #   hold:        CPU $B1B8 = file $31C8
     #   ExitCtrl:    CPU $B1BA = file $31CA (original RTS, untouched)
+    #   CloudExit:   CPU $B1BB = file $31CB (original routine, untouched)
     if verify_context(data, 0x3189, bytes([0xA5, 0xB5, 0xC9, 0x02, 0x30, 0x3B, 0xA2, 0x01]),
                        "PlayerHole: LDA HighPos, CMP #$02, BMI ExitCtrl, LDX #$01"):
         new_code = bytes([
             # --- Check HighPos ---
             0xA5, 0xB5,             # LDA Player_Y_HighPos
             0xC9, 0x02,             # CMP #$02
-            0xB0, 0x30,             # BCS deep_fall            (HighPos >= 2: backup)
-            0xC9, 0x01,             # CMP #$01
-            0xD0, 0x37,             # BNE ExitCtrl             (HighPos == 0: above screen, exit)
+            0xB0, 0x2A,             # BCS deep_fall            (HighPos >= 2 -> $B1A9)
+            0xAA,                   # TAX                      (X = HighPos; Z=1 if 0)
+            0xF0, 0x38,             # BEQ ExitCtrl             (HighPos == 0 -> $B1BA)
             # --- HighPos == 1 (normal play area): check if falling ---
             0xA5, 0x1D,             # LDA Player_State
             0xC9, 0x02,             # CMP #$02
-            0xD0, 0x31,             # BNE ExitCtrl             (not falling: exit)
+            0xD0, 0x32,             # BNE ExitCtrl             (not falling -> $B1BA)
+            # --- Cloud area bypass: don't catch falls in coin heaven ---
+            0xAD, 0x43, 0x07,       # LDA CloudTypeOverride    ($0743)
+            0xD0, 0x2D,             # BNE ExitCtrl             (cloud area: let Mario fall -> $B1BA)
             # --- Check if below ground threshold ---
             0xA5, 0xCE,             # LDA Player_Y_Position
             0xC9, 0xC0,             # CMP #$C0
-            0x90, 0x2B,             # BCC ExitCtrl             (above $C0: normal fall, exit)
+            0x90, 0x27,             # BCC ExitCtrl             (above $C0 -> $B1BA)
             # --- chk_injury: if i-frames active, hold instead of boost ---
-            0xAD, 0x9E, 0x07,       # LDA InjuryTimer ($079E)
-            0xD0, 0x11,             # BNE hold                 (i-frames active: hold position)
+            0xA2, 0x00,             # LDX #$00                 (X=0 for STX later)
+            0xAD, 0x9E, 0x07,       # LDA InjuryTimer          ($079E)
+            0xD0, 0x1E,             # BNE hold                 (i-frames active -> $B1B8)
             # --- boost: zero sub-pixel, set velocity, fix gravity ---
-            0xA9, 0x00,             # LDA #$00
-            0x8D, 0x33, 0x04,       # STA Player_Y_MoveForce   (zero sub-pixel)
+            0x8E, 0x33, 0x04,       # STX Player_Y_MoveForce   ($0433, X=0)
             0xA9, 0xF4,             # LDA #$F4                 (springboard velocity)
             0x85, 0x9F,             # STA Player_Y_Speed
-            0xA9, 0x70,             # LDA #$70
-            0x8D, 0x0A, 0x07,       # STA VerticalForceDown    (set jump gravity, not walk-off gravity)
-            0x4C, 0xBA, 0xB1,       # JMP ExitCtrl
-            # --- hold: during i-frames, freeze at $C0 with no velocity ---
-            0xA9, 0x00,             # LDA #$00
-            0x85, 0x9F,             # STA Player_Y_Speed       (zero velocity)
-            0xA9, 0xC0,             # LDA #$C0
-            0x85, 0xCE,             # STA Player_Y_Position    (hold at threshold)
-            0xD0, 0x0B,             # BNE ExitCtrl             (branch always: A=$C0 != 0)
-            # --- deep_fall: backup for HighPos >= 2 ---
+            0xA9, 0x70,             # LDA #$70                 (jump gravity)
+            0x8D, 0x0A, 0x07,       # STA VerticalForceDown    ($070A)
+            0x4C, 0xBA, 0xB1,       # JMP ExitCtrl             ($B1BA)
+            # --- deep_fall: HighPos >= 2 ---
+            0xAD, 0x43, 0x07,       # LDA CloudTypeOverride    ($0743)
+            0xF0, 0x03,             # BEQ df_normal             (not cloud -> $B1B1)
+            0x4C, 0xBB, 0xB1,       # JMP CloudExit            ($B1BB)
+            # --- df_normal: reset to play area, zero velocity, return ---
+            0x85, 0x9F,             # STA Player_Y_Speed       (A=0, zero velocity)
             0xA9, 0x01,             # LDA #$01
-            0x85, 0xB5,             # STA Player_Y_HighPos     (back to play area)
-            0xA9, 0xC0,             # LDA #$C0
-            0x85, 0xCE,             # STA Player_Y_Position    (at threshold)
-            0x4C, 0x8F, 0xB1,       # JMP chk_injury           (check i-frames before boost)
+            0x85, 0xB5,             # STA Player_Y_HighPos     (back to page 1)
+            0x60,                   # RTS
+            # --- hold: i-frames active, zero velocity ---
+            0x86, 0x9F,             # STX Player_Y_Speed       (X=0)
+            # falls through to ExitCtrl RTS at $B1BA
         ])
         nop_fill = bytes([0xEA] * (65 - len(new_code)))
         data = data[:0x3189] + new_code + nop_fill + data[0x31CA:]
-        print(f"  OK: $3189-$31C9: replaced death check + routine with early Y-floor boost")
-        print(f"       Mario gets springboard velocity when Y >= $E0 while falling")
+        print(f"  OK: $3189-$31C9: pit survival with cloud area bypass ({len(new_code)} bytes)")
         patches_applied += 1
     else:
         patches_failed += 1
