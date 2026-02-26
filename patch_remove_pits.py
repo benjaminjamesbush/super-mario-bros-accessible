@@ -1,17 +1,13 @@
 """
 Super Mario Bros. (NES) - Accessibility Pit Removal Patch
 
-Removes all pits/holes from the game to make it accessible for special needs players.
-Applies 8 patches and 4 Game Genie codes to the ROM:
+Makes Super Mario Bros. more accessible for special needs players.
+Applies 4 patches and 4 Game Genie codes to the ROM:
 
-1. TerrainRenderBits pattern 0: "no floor" -> "2-row floor" (visual floor everywhere)
-2. TerrainRenderBits pattern 10: "ceiling only, no floor" -> "ceiling + floor"
-3. Hole_Empty subroutine: RTS immediately (holes never remove ground tiles)
-4. Hole_Water subroutine: RTS immediately (water holes never remove ground)
-5. PlayerHole death -> position reset (if Mario falls, reappear mid-screen instead of dying)
-6. Timer freeze: NOP the timer digit decrement (timer stays at starting value)
-7. Springboard always boosts: default force changed from $F9 to $F4 (max bounce every time)
-8. Castle maze auto-correct: teleport Mario to the correct path at each checkpoint (4-4, 7-4, 8-4)
+1. Pit survival: falling below screen launches Mario upward with springboard velocity (pits = bounce, not death)
+2. Timer freeze: NOP the timer digit decrement (timer stays at starting value)
+3. Springboard always boosts: default force changed from $F9 to $F4 (max bounce every time)
+4. Castle maze auto-correct: teleport Mario to the correct path at each checkpoint (4-4, 7-4, 8-4)
 
 Game Genie codes baked in:
 - POAISA: Power up on enemies (touching enemies powers you up instead of hurting you)
@@ -147,120 +143,73 @@ def main():
     patches_failed = 0
 
     # ================================================================
-    # PATCH 1: TerrainRenderBits pattern 0 - add floor
+    # PATCH 1: Pit survival - early catch with upward boost
     # ================================================================
-    print("--- Patch 1: TerrainRenderBits pattern 0 (no floor -> floor) ---")
-    # The table at file offset $13EC starts with: $00 $00 (pattern 0 = no terrain)
-    # Change byte 2 from $00 to $18 (adds 2-row floor, matching pattern 1)
-    # Context: TerrainMetatiles ($69 $54 $52 $62) immediately before
-    if verify_context(data, 0x13E8, bytes([0x69, 0x54, 0x52, 0x62, 0x00, 0x00, 0x00, 0x18]),
-                       "TerrainMetatiles + TerrainRenderBits[0..1]"):
-        data, ok = apply_patch(data, 0x13ED, 0x00, 0x18,
-                               "TerrainRenderBits pattern 0 byte 2: no floor -> 2-row floor")
-        if ok:
-            patches_applied += 1
-        else:
-            patches_failed += 1
-    else:
-        patches_failed += 1
-
-    # ================================================================
-    # PATCH 2: TerrainRenderBits pattern 10 - add floor
-    # ================================================================
-    print()
-    print("--- Patch 2: TerrainRenderBits pattern 10 (ceiling, no floor -> ceiling+floor) ---")
-    # Pattern 10 is at table offset 20 (0x14): file offset $13EC + $14 = $1400
-    # Bytes: $01 $00 -> change $00 to $18
-    if verify_context(data, 0x1400, bytes([0x01, 0x00]),
-                       "TerrainRenderBits pattern 10"):
-        data, ok = apply_patch(data, 0x1401, 0x00, 0x18,
-                               "TerrainRenderBits pattern 10 byte 2: no floor -> 2-row floor")
-        if ok:
-            patches_applied += 1
-        else:
-            patches_failed += 1
-    else:
-        patches_failed += 1
-
-    # ================================================================
-    # PATCH 3: Hole_Empty subroutine - skip entirely
-    # ================================================================
-    print()
-    print("--- Patch 3: Hole_Empty subroutine (JSR -> RTS, skip hole rendering) ---")
-    # HoleMetatiles table at $1B4D: $87 $00 $00 $00
-    # Hole_Empty code starts at $1B51 with JSR ChkLrgObjLength ($20 $AC $9B)
-    # Change first byte from $20 (JSR) to $60 (RTS) to skip the entire routine
-    if verify_context(data, 0x1B4D, bytes([0x87, 0x00, 0x00, 0x00, 0x20, 0xAC, 0x9B]),
-                       "HoleMetatiles + Hole_Empty start"):
-        data, ok = apply_patch(data, 0x1B51, 0x20, 0x60,
-                               "Hole_Empty: JSR $9BAC -> RTS (skip hole rendering)")
-        if ok:
-            patches_applied += 1
-        else:
-            patches_failed += 1
-    else:
-        patches_failed += 1
-
-    # ================================================================
-    # PATCH 4: Hole_Water subroutine - skip entirely
-    # ================================================================
-    print()
-    print("--- Patch 4: Hole_Water subroutine (JSR -> RTS, skip water hole rendering) ---")
-    # Hole_Water at $1967: JSR ChkLrgObjLength ($20 $AC $9B), then LDA #$86 ($A9 $86)
-    if verify_context(data, 0x1967, bytes([0x20, 0xAC, 0x9B, 0xA9, 0x86]),
-                       "Hole_Water start"):
-        data, ok = apply_patch(data, 0x1967, 0x20, 0x60,
-                               "Hole_Water: JSR $9BAC -> RTS (skip water hole rendering)")
-        if ok:
-            patches_applied += 1
-        else:
-            patches_failed += 1
-    else:
-        patches_failed += 1
-
-    # ================================================================
-    # PATCH 5: PlayerHole - position reset instead of death
-    # ================================================================
-    print()
-    print("--- Patch 5: PlayerHole death -> position reset ---")
-    # At $3189: LDA Player_Y_HighPos, CMP #$02, BMI ExitCtrl
-    # The death code runs from $318F to $31C9 (59 bytes) when Mario falls below screen.
-    # Replace it with code that resets Mario's position to mid-screen and lets him
-    # fall back to the ground, instead of killing him.
+    print("--- Patch 1: Pit survival (early Y-floor with upward boost) ---")
+    # REPLACES the 6-byte death check ($3189) AND the 59-byte death routine ($318F)
+    # with 65 bytes of new code ($3189-$31C9). ExitCtrl RTS at $31CA is untouched.
     #
-    # RAM addresses (confirmed from disassembly cross-references):
-    #   $B5   = Player_Y_HighPos    (vertical screen page)
-    #   $CE   = Player_Y_Position   (vertical position low byte)
-    #   $9F   = Player_Y_Speed      (vertical velocity)
-    #   $0433 = Player_Y_MoveForce  (sub-pixel vertical accumulator)
-    #   $1D   = Player_State        (0=ground, 1=jump, 2=falling, 3=climbing)
-    #   ExitCtrl = CPU $B1BA        (RTS at file offset $31CA)
-    if verify_context(data, 0x318F, bytes([0xA2, 0x01, 0x8E, 0x23, 0x07]),
-                       "PlayerHole death code: LDX #$01, STX ScrollLock"):
+    # The original code waited until Mario was a full screen below visible (HighPos >= 2)
+    # before triggering. By then, Mario had drifted horizontally out of the pit's open
+    # air column, causing the boost to clip through adjacent ground/bricks.
+    #
+    # New approach: enforce a Y-floor EVERY FRAME. When Mario is falling and his Y
+    # position exceeds $E0 (just below ground level), immediately give him springboard
+    # upward velocity. At this point Mario is still directly under the pit opening,
+    # so the upward path is clear air — no clipping.
+    #
+    # A backup deep-fall handler catches HighPos >= 2 in case the early check misses.
+    #
+    # CPU addresses (file offset = CPU - $8000 + $10):
+    #   Code start:  CPU $B179 = file $3189
+    #   boost:       CPU $B18F = file $319F
+    #   deep_fall:   CPU $B196 = file $31A6
+    #   ExitCtrl:    CPU $B1BA = file $31CA (original RTS, untouched)
+    if verify_context(data, 0x3189, bytes([0xA5, 0xB5, 0xC9, 0x02, 0x30, 0x3B, 0xA2, 0x01]),
+                       "PlayerHole: LDA HighPos, CMP #$02, BMI ExitCtrl, LDX #$01"):
         new_code = bytes([
-            0xA9, 0x01,             # LDA #$01
-            0x85, 0xB5,             # STA Player_Y_HighPos     (back on screen)
-            0xA9, 0x80,             # LDA #$80
-            0x85, 0xCE,             # STA Player_Y_Position    (mid-screen)
+            # --- Check HighPos ---
+            0xA5, 0xB5,             # LDA Player_Y_HighPos
+            0xC9, 0x02,             # CMP #$02
+            0xB0, 0x21,             # BCS deep_fall            (HighPos >= 2: backup)
+            0xC9, 0x01,             # CMP #$01
+            0xD0, 0x37,             # BNE ExitCtrl             (HighPos == 0: above screen, exit)
+            # --- HighPos == 1 (normal play area): check if falling ---
+            0xA5, 0x1D,             # LDA Player_State
+            0xC9, 0x02,             # CMP #$02
+            0xD0, 0x31,             # BNE ExitCtrl             (not falling: exit)
+            # --- Check if below ground threshold ---
+            0xA5, 0xCE,             # LDA Player_Y_Position
+            0xC9, 0xC0,             # CMP #$C0
+            0x90, 0x2B,             # BCC ExitCtrl             (above $C0: normal fall, exit)
+            # --- boost: zero sub-pixel, set velocity, fix gravity ---
             0xA9, 0x00,             # LDA #$00
-            0x85, 0x9F,             # STA Player_Y_Speed       (zero velocity)
             0x8D, 0x33, 0x04,       # STA Player_Y_MoveForce   (zero sub-pixel)
-            0xA9, 0x02,             # LDA #$02
-            0x85, 0x1D,             # STA Player_State         (set to falling)
-            0x4C, 0xBA, 0xB1,       # JMP ExitCtrl             (resume gameplay)
+            0xA9, 0xF4,             # LDA #$F4                 (springboard velocity)
+            0x85, 0x9F,             # STA Player_Y_Speed
+            0xA9, 0x70,             # LDA #$70
+            0x8D, 0x0A, 0x07,       # STA VerticalForceDown    (set jump gravity, not walk-off gravity)
+            0x4C, 0xBA, 0xB1,       # JMP ExitCtrl
+            # --- deep_fall: backup for HighPos >= 2 ---
+            0xA9, 0x01,             # LDA #$01
+            0x85, 0xB5,             # STA Player_Y_HighPos     (back to play area)
+            0xA9, 0xC0,             # LDA #$C0
+            0x85, 0xCE,             # STA Player_Y_Position    (at threshold)
+            0x4C, 0x8F, 0xB1,       # JMP boost                (zero MoveForce + velocity + gravity)
         ])
-        nop_fill = bytes([0xEA] * (59 - len(new_code)))
-        data = data[:0x318F] + new_code + nop_fill + data[0x31CA:]
-        print(f"  OK: $318F-$31C9: replaced 59-byte death routine with position reset")
+        nop_fill = bytes([0xEA] * (65 - len(new_code)))
+        data = data[:0x3189] + new_code + nop_fill + data[0x31CA:]
+        print(f"  OK: $3189-$31C9: replaced death check + routine with early Y-floor boost")
+        print(f"       Mario gets springboard velocity when Y >= $E0 while falling")
         patches_applied += 1
     else:
         patches_failed += 1
 
     # ================================================================
-    # PATCH 6: Timer freeze - NOP the digit decrement
+    # PATCH 2: Timer freeze - NOP the digit decrement
     # ================================================================
     print()
-    print("--- Patch 6: Timer freeze (NOP digit decrement) ---")
+    print("--- Patch 2: Timer freeze (NOP digit decrement) ---")
     # In RunGameTimer (CPU $B74F), the timer is decremented by storing $FF (-1)
     # into DigitModifier+5 at CPU $B78F: STA $0139 (bytes: $8D $39 $01)
     # NOP these 3 bytes so the timer digit modifier is never set, freezing the timer.
@@ -276,10 +225,10 @@ def main():
         patches_failed += 1
 
     # ================================================================
-    # PATCH 7: Springboard always gives max boost
+    # PATCH 3: Springboard always gives max boost
     # ================================================================
     print()
-    print("--- Patch 7: Springboard always max boost ---")
+    print("--- Patch 3: Springboard always max boost ---")
     # In ChkForLandJumpSpring (CPU $DEC4), when Mario lands on the springboard,
     # JumpspringForce is initialized to $F9 (low bounce). The player must press A
     # with precise timing during the animation to upgrade it to $F4 (high bounce).
@@ -297,10 +246,10 @@ def main():
         patches_failed += 1
 
     # ================================================================
-    # PATCH 8: Castle maze auto-correct
+    # PATCH 4: Castle maze auto-correct
     # ================================================================
     print()
-    print("--- Patch 8: Castle maze auto-correct ---")
+    print("--- Patch 4: Castle maze auto-correct ---")
     # In ProcLoopCommand (CPU $C0CC), castle levels 4-4, 7-4, 8-4 check if Mario
     # is at the correct Y-position at certain page boundaries. Wrong position loops
     # the level back, creating a maze puzzle. This is inaccessible for cognitively
@@ -361,8 +310,8 @@ def main():
     # ================================================================
     print()
     print("=" * 60)
-    print(f"Patches applied: {patches_applied}/8")
-    print(f"Patches failed:  {patches_failed}/8")
+    print(f"Patches applied: {patches_applied}/4")
+    print(f"Patches failed:  {patches_failed}/4")
     print(f"Game Genie codes: {gg_applied}/4")
 
     if patches_applied == 0:
@@ -383,10 +332,7 @@ def main():
     print(f"New MD5: {new_md5}")
     print()
     print("What was changed:")
-    print("  - Ground/floor is always present (no gaps in terrain)")
-    print("  - Hole objects in level data are ignored (pits never carved out)")
-    print("  - Water holes are also ignored")
-    print("  - Falling below the screen resets Mario to mid-screen (no death)")
+    print("  - Pits are survivable (Mario bounces out with springboard velocity)")
     print("  - Timer is frozen (no time pressure)")
     print("  - Springboard always gives max boost (no precise timing needed)")
     print("  - Castle mazes auto-corrected (Mario teleported to correct path in 4-4, 7-4, 8-4)")
