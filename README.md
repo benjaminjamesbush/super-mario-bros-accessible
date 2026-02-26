@@ -23,7 +23,7 @@ Outputs a patched ROM with `- No Pits` appended to the filename.
 | 5 | `$3189` | 65 bytes | Pit survival: bounce out with springboard velocity |
 | 6 | `$379F` | 3 bytes | Timer frozen (digit decrement NOPed) |
 | 7 | `$5EDF` | 1 byte | Springboard always gives max boost |
-| 8 | `$40FB` | 13 bytes | Castle maze auto-solved (4-4, 7-4, 8-4) |
+| 8 | `$40FB` | 13 bytes | Castle maze auto-solved (4-4, 7-4 teleport; 8-4 pass-through) |
 
 **Patches 1-4: Pit removal.** Pits in SMB1 are created through three independent mechanisms — terrain patterns that omit floor tiles, and hole objects that carve ground out. Patches 1-2 change the "no floor" and "ceiling only" terrain patterns to always include ground. Patches 3-4 change the `Hole_Empty` and `Hole_Water` subroutines from `JSR` (call) to `RTS` (return immediately), so they never remove ground tiles.
 
@@ -39,7 +39,7 @@ Outputs a patched ROM with `- No Pits` appended to the filename.
 
 **Patch 7: Springboard always max boost.** Changes the default `JumpspringForce` from `$F9` (low bounce) to `$F4` (max bounce). Every springboard gives a full boost regardless of button timing.
 
-**Patch 8: Castle maze auto-correct.** Worlds 4-4, 7-4, and 8-4 have branching paths where only one continues forward. Instead of checking Mario's Y-position against a lookup table, this patch *sets* his position to the correct value from that same table. Mario is automatically teleported to the correct path at each checkpoint.
+**Patch 8: Castle maze auto-correct.** Worlds 4-4, 7-4, and 8-4 have branching paths where only one continues forward. Instead of checking Mario's Y-position against a lookup table, this patch loads the table value and checks if it's safe (< $C0). For 4-4 and 7-4 (table values $40/$80/$B0), Mario is teleported to the correct corridor. For 8-4 (table values $F0, which are below the floor in patched terrain), the teleport is skipped — the maze check still passes (no loopback), but Mario stays at his natural position. The pit fill patches ensure all 8-4 terrain is walkable from any position.
 
 ## Game Genie Codes
 

@@ -277,9 +277,14 @@ def main():
     # the level back, creating a maze puzzle. This is inaccessible for cognitively
     # impaired players, AND simply disabling the loop causes soft-locks (dead-end paths).
     #
-    # Fix: replace the Y-position CHECK with a Y-position SET. Instead of comparing
-    # Mario's position to the required value, we MOVE Mario to the correct position.
-    # This ensures Mario is always on the right path at every checkpoint.
+    # Fix: load the correct Y from the table. If the value is safe (< $C0), teleport
+    # Mario there and set him on-ground. If the value is dangerous (>= $C0, i.e. 8-4's
+    # $F0 entries which are below the floor), skip the teleport entirely — the maze check
+    # still passes (no loopback), but Mario stays at his natural position.
+    #
+    # This works because all 4-4/7-4 table values ($40/$80/$B0) are < $C0 and land in
+    # open corridors, while all 8-4 values ($F0) are >= $C0. For 8-4, our pit fill
+    # patches ensure all terrain is walkable, so Mario can proceed from any position.
     #
     # Original 13 bytes at CPU $C0EB (file $40FB):
     #   A5 CE       LDA Player_Y_Position
@@ -291,26 +296,26 @@ def main():
     #
     # New 13 bytes:
     #   B9 81 C0    LDA $C081,Y           (load correct Y from table)
+    #   C9 C0       CMP #$C0              (is it at/below floor level?)
+    #   B0 06       BCS $C0F8             (>= $C0: skip teleport, fall through to pass)
     #   85 CE       STA Player_Y_Position (teleport Mario to correct path)
     #   A9 00       LDA #$00
-    #   85 9F       STA Player_Y_Speed    (zero vertical velocity)
     #   85 1D       STA Player_State      (set to on-ground)
-    #   EA EA       NOP NOP               (pad to 13 bytes)
     original = bytes([0xA5, 0xCE, 0xD9, 0x81, 0xC0, 0xD0, 0x23,
                       0xA5, 0x1D, 0xC9, 0x00, 0xD0, 0x1D])
     if verify_context(data, 0x40FB, original,
                        "ProcLoopCommand: Y-position check + Player_State check"):
         new_code = bytes([
             0xB9, 0x81, 0xC0,   # LDA $C081,Y  (correct Y from table)
-            0x85, 0xCE,         # STA Player_Y_Position
+            0xC9, 0xC0,         # CMP #$C0     (at/below floor level?)
+            0xB0, 0x06,         # BCS +6       (>= $C0: skip teleport -> $C0F8)
+            0x85, 0xCE,         # STA Player_Y_Position (teleport)
             0xA9, 0x00,         # LDA #$00
-            0x85, 0x9F,         # STA Player_Y_Speed
             0x85, 0x1D,         # STA Player_State (on ground)
-            0xEA, 0xEA,         # NOP NOP
         ])
         data = data[:0x40FB] + new_code + data[0x4108:]
-        print(f"  OK: $40FB-$4107: replaced Y-position check with auto-correct")
-        print(f"       Mario is teleported to the correct path at each checkpoint")
+        print(f"  OK: $40FB-$4107: maze auto-correct with conditional teleport")
+        print(f"       4-4/7-4: teleport to correct path  |  8-4: pass check, no teleport")
         patches_applied += 1
     else:
         patches_failed += 1
