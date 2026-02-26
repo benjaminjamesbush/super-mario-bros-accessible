@@ -2,19 +2,17 @@
 
 A Python script that patches **Super Mario Bros. (NES)** to make the game more accessible for special needs players. Bounces Mario out of pits instead of dying, freezes the timer, auto-solves castle mazes, and bakes in Game Genie codes for power-up-on-enemies and always-stay-big.
 
-The original file is not modified — a new patched ROM is created.
-
 ## Why This Exists
 
-Players with intellectual disabilities face specific barriers when playing video games for the first time. Precise timing, instant-death hazards, complex puzzles, and time pressure all create frustration that disrupts the experience before it begins.
+Super Mario Bros. is one of the best games to hand to a first-time player with intellectual disabilities. The controls are a d-pad and two buttons. The levels go left to right. The visual language is clear — coins are good, pipes go somewhere, the flag at the end means you made it. It runs on inexpensive retro handhelds, and nearly everyone recognizes it.
 
-Super Mario Bros. is an ideal base game for this audience. The controls are simple — a d-pad and two buttons. The visual language is clear and immediate. The levels progress linearly from left to right. It's universally recognized, runs on inexpensive retro handhelds, and the core mechanic — walk right, jump sometimes — is intuitive even for a first-time player.
+The ideal experience for this audience is casual and exploratory: walk to the right, jump sometimes, enjoy the music and the graphics and the variety of 32 different levels. Not a test of skill — just a pleasant walk through a colorful world.
 
-The ideal first experience for a player with intellectual disabilities is casual and exploratory: a simple walk to the right with occasional jumping, enjoying the graphics, the sound effects, the music, and the variety of different levels. For the general population this level of ease might feel boring, but for a first-time player with intellectual disabilities, it's exactly right. The goal is to make the game a pleasant, low-stress experience rather than a test of skill.
+But unmodified SMB1 doesn't let that experience happen. Bottomless pits and enemies both kill Mario and force the player to restart — and a player who doesn't think to avoid Goombas will walk into every single one. The timer kills Mario after 400 ticks — a sudden death with no obvious visible cause. Springboards require precisely timed button presses. Castle mazes loop endlessly without the right path memorized. Each of these is a source of frustration. For a player with intellectual disabilities, that frustration can mean the difference between engagement and abandonment.
 
-Even with its simplicity, unmodified SMB1 has pain points for this audience. Bottomless pits cause instant death and force replaying large sections of a level. The countdown timer adds pressure. Springboards require precisely timed button presses. Castle mazes require memorization of correct paths. Enemies cause death, impede forward progress, and create frustration — every Goomba or Koopa is a potential interruption to the casual, exploratory experience the player needs.
+This patch removes those frustrations. Mario bounces out of pits instead of dying, the timer stays frozen, springboards always give a full boost, castle mazes solve themselves, and enemies become fun collectables that power Mario up on contact. He still runs, jumps, collects coins, enters pipes, and progresses through all 32 levels. The world is the same — it's just safe to explore.
 
-This patch removes those barriers while preserving the core experience. Mario still runs, jumps, collects coins, enters pipes, and progresses through all 32 levels. The world is the same — it's just safe to explore.
+Pairing the patched ROM with a device that has arcade-style controls — like the Powkiddy A13 — can further increase accessibility for players with fine motor control challenges. A full-sized joystick and large buttons are easier to use than a small d-pad and tiny face buttons.
 
 ## Usage
 
@@ -22,7 +20,7 @@ This patch removes those barriers while preserving the core experience. Mario st
 python patch_smb1_accessible.py "Super Mario Bros. (World).nes"
 ```
 
-Outputs a patched ROM with `- Accessible` appended to the filename.
+Outputs a patched ROM with `- Accessible` appended to the filename. The original file is not modified.
 
 ## What It Does
 
@@ -58,7 +56,7 @@ The script also bakes in four Game Genie codes, decoded and applied directly to 
 | AATLGZ | `$B264` | `$3274` | Always stay big (2/3) |
 | SZLIVO | `$D936` | `$5946` | Always stay big (3/3) |
 
-The OZTLLX + AATLGZ + SZLIVO combination prevents Mario from reverting to small form when hit.
+Power-up-on-enemies alone doesn't make Mario invincible — fire bars and hammers still injure him. The OZTLLX + AATLGZ + SZLIVO combination prevents Mario from reverting to small form when hit, so the two codes together make him effectively invincible.
 
 ## How It Works
 
@@ -79,6 +77,18 @@ Tested with `Super Mario Bros. (World).nes`. Other regional variants (Japan, Eur
 - [SMB1 Disassembly (Xkeeper0)](https://github.com/Xkeeper0/smb1)
 - [Super Mario Bros. ROM Map - Data Crystal](https://datacrystal.tcrf.net/wiki/Super_Mario_Bros.:ROM_map)
 
+## Contact
+
+If you have concerns, questions, or want to discuss anything related to accessibility and gaming, reach out directly at benjaminjamesbush@gmail.com.
+
+## Disclaimer
+
+This project is not affiliated with or endorsed by Nintendo. Super Mario Bros. is a trademark of Nintendo. No copyrighted material is distributed — the patch script modifies a ROM image that the user must supply.
+
+## Acknowledgements
+
+This patch was developed in collaboration with [Claude Code](https://claude.ai/claude-code).
+
 ## License
 
-MIT
+[Unlicense](https://unlicense.org/) — public domain.
