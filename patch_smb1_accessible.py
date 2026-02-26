@@ -1,20 +1,21 @@
 """
-Super Mario Bros. (NES) - Accessibility Pit Removal Patch
+Super Mario Bros. (NES) - Accessibility Patch
 
 Makes Super Mario Bros. more accessible for special needs players.
-Applies 4 patches and 4 Game Genie codes to the ROM:
+Applies 4 ROM patches and 4 Game Genie codes:
 
-1. Pit survival: falling below screen launches Mario upward with springboard velocity (pits = bounce, not death)
-2. Timer freeze: NOP the timer digit decrement (timer stays at starting value)
-3. Springboard always boosts: default force changed from $F9 to $F4 (max bounce every time)
-4. Castle maze auto-correct: teleport Mario to the correct path at each checkpoint (4-4, 7-4, 8-4)
+Patches:
+1. Pit survival: bounces Mario out of pits with springboard velocity instead of dying
+2. Timer freeze: no time pressure
+3. Springboard always max boost: no precise timing needed
+4. Castle maze auto-correct: auto-solve 4-4, 7-4, 8-4 mazes
 
-Game Genie codes baked in:
+Game Genie codes:
 - POAISA: Power up on enemies (touching enemies powers you up instead of hurting you)
 - OZTLLX + AATLGZ + SZLIVO: Always stay big (never revert to small Mario)
 
 Usage:
-    python patch_remove_pits.py "Super Mario Bros. (World).nes"
+    python patch_smb1_accessible.py "Super Mario Bros. (World).nes"
 
 The patched ROM is written alongside the original with " - No Pits" appended to the name.
 The original ROM is not modified.
@@ -106,7 +107,7 @@ def verify_context(data, offset, expected_bytes, label):
 
 def main():
     print("=" * 60)
-    print("Super Mario Bros. - Accessibility Pit Removal Patch")
+    print("Super Mario Bros. - Accessibility Patch")
     print("=" * 60)
     print()
 
