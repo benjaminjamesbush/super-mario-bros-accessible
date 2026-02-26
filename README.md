@@ -1,8 +1,8 @@
 # SMB1 No Pits - Accessibility Patch
 
-A Python script that patches **Super Mario Bros. (NES)** to remove all pits and holes, making the game more accessible for special needs players. Also bakes in Game Genie codes for power-up-on-enemies and always-stay-big.
+A Python script that patches **Super Mario Bros. (NES)** to make the game more accessible for special needs players. Fills all pits with ground, adds a safety-net bounce for any remaining falls, freezes the timer, auto-solves castle mazes, and bakes in Game Genie codes for power-up-on-enemies and always-stay-big.
 
-Changes 4 bytes, replaces one 59-byte routine, NOPs the timer decrement, and applies 4 Game Genie codes. The original file is not modified.
+The original file is not modified — a new patched ROM is created.
 
 ## Usage
 
@@ -14,30 +14,32 @@ Outputs a patched ROM with `- No Pits` appended to the filename.
 
 ## What It Does
 
-Pits in SMB1 are created through three independent mechanisms. This patch neutralizes all of them:
+| Patch | Offset | Size | Effect |
+|-------|--------|------|--------|
+| 1 | `$13ED` | 1 byte | Terrain pattern "no floor" now renders 2-row ground |
+| 2 | `$1401` | 1 byte | Terrain pattern "ceiling only" now includes floor |
+| 3 | `$1B51` | 1 byte | `Hole_Empty` returns immediately (ground never carved out) |
+| 4 | `$1967` | 1 byte | `Hole_Water` returns immediately (water pits removed) |
+| 5 | `$3189` | 65 bytes | Pit survival: bounce out with springboard velocity |
+| 6 | `$379F` | 3 bytes | Timer frozen (digit decrement NOPed) |
+| 7 | `$5EDF` | 1 byte | Springboard always gives max boost |
+| 8 | `$40FB` | 13 bytes | Castle maze auto-solved (4-4, 7-4, 8-4) |
 
-| Patch | Offset | Change | Mechanism |
-|-------|--------|--------|-----------|
-| 1 | `$13ED` | `$00`->`$18` | Terrain pattern "no floor" now renders 2-row ground |
-| 2 | `$1401` | `$00`->`$18` | Terrain pattern "ceiling only" now includes floor |
-| 3 | `$1B51` | `$20`->`$60` | `Hole_Empty` routine returns immediately (ground never carved out) |
-| 4 | `$1967` | `$20`->`$60` | `Hole_Water` routine returns immediately (water pits removed) |
-| 5 | `$318F` | 59 bytes | `PlayerHole` death routine replaced with position reset |
-| 6 | `$379F` | 3 bytes NOP | Timer digit decrement removed (timer frozen) |
-| 7 | `$5EDF` | `$F9`->`$F4` | Springboard default force changed to max boost |
-| 8 | `$40FB` | 13 bytes | Castle maze Y-check replaced with auto-correct (4-4, 7-4, 8-4) |
+**Patches 1-4: Pit removal.** Pits in SMB1 are created through three independent mechanisms — terrain patterns that omit floor tiles, and hole objects that carve ground out. Patches 1-2 change the "no floor" and "ceiling only" terrain patterns to always include ground. Patches 3-4 change the `Hole_Empty` and `Hole_Water` subroutines from `JSR` (call) to `RTS` (return immediately), so they never remove ground tiles.
 
-**Patches 1-2** ensure the base terrain always includes ground tiles, even when level data or mid-level commands set the floor pattern to "empty."
+**Patch 5: Pit survival.** Safety net for any fall that gets past the pit fill (e.g. pushed through floor by a moving platform). Replaces the original 65-byte `PlayerHole` death check and death routine with new 6502 code that:
 
-**Patches 3-4** prevent hole objects from removing ground tiles. The `Hole_Empty` and `Hole_Water` 6502 subroutines have their first instruction changed from `JSR` (call subroutine) to `RTS` (return immediately), so they do nothing.
+- Detects Mario falling below Y=$C0 in the normal play area (HighPos=1) while airborne and moving downward
+- Applies springboard upward velocity ($F4) with jump gravity ($70) to launch him out of the pit
+- During i-frames (after getting hit), freezes Mario in place instead of boosting — zeroes both vertical and horizontal speed plus the sub-pixel accumulator to prevent clipping through pit walls or floor while tile collision is disabled
+- Bypasses cloud/coin heaven areas (`CloudTypeOverride != 0`) so Mario can fall through the bottom to exit bonus areas normally
+- If Mario somehow reaches HighPos >= 2 (full screen below), resets him to the play area; in cloud areas, jumps to the original `CloudExit` routine instead
 
-**Patch 5** replaces the pit death routine with a position reset. If Mario somehow falls below the screen (e.g. pushed through the floor by a moving platform), instead of dying he reappears mid-screen and falls back to the ground. The 59-byte death routine is replaced with 22 bytes of new 6502 code that resets `Player_Y_HighPos`, `Player_Y_Position`, `Player_Y_Speed`, `Player_Y_MoveForce`, and `Player_State`.
+**Patch 6: Timer freeze.** NOPs the `STA DigitModifier+5` instruction in `RunGameTimer`, removing the -1 fed into `DigitsMathRoutine` each tick. The timer display never changes. Scores and coin counts are unaffected.
 
-**Patch 6** freezes the level timer by NOPing the `STA DigitModifier+5` instruction in `RunGameTimer`. This removes the -1 that the timer routine feeds into `DigitsMathRoutine` each tick, so the timer display never changes. Scores and coin counts are unaffected because `DigitsMathRoutine` itself is not modified.
+**Patch 7: Springboard always max boost.** Changes the default `JumpspringForce` from `$F9` (low bounce) to `$F4` (max bounce). Every springboard gives a full boost regardless of button timing.
 
-**Patch 7** makes the springboard always give the maximum boost jump. Normally, `ChkForLandJumpSpring` initializes `JumpspringForce` to `$F9` (low bounce), and the player must press A with precise timing during the spring animation to upgrade it to `$F4` (high bounce). This patch changes the default to `$F4`, so every springboard bounce is a full boost regardless of button timing.
-
-**Patch 8** solves the castle maze puzzle in worlds 4-4, 7-4, and 8-4. These levels have branching paths where only one path continues forward — the others dead-end into walls, and the game was designed to loop you back to try again. Instead of checking Mario's Y-position against a lookup table, this patch *sets* Mario's position to the correct value from that same table. At each maze checkpoint, Mario is automatically teleported to the correct path, so the level always advances regardless of which path the player chose.
+**Patch 8: Castle maze auto-correct.** Worlds 4-4, 7-4, and 8-4 have branching paths where only one continues forward. Instead of checking Mario's Y-position against a lookup table, this patch *sets* his position to the correct value from that same table. Mario is automatically teleported to the correct path at each checkpoint.
 
 ## Game Genie Codes
 
@@ -64,11 +66,6 @@ The script validates:
 ## Compatibility
 
 Tested with `Super Mario Bros. (World).nes`. Other regional variants (Japan, Europe) may have different byte offsets — the context verification will catch any mismatch.
-
-## Roadmap
-
-- ~~**Stop timer**: Freeze the level timer so there's no time pressure~~ Done (Patch 6)
-- ~~**Springboard always boosts**: Make the trampoline/springboard always give a full boost jump instead of requiring precise timing~~ Done (Patch 7)
 
 ## References
 
