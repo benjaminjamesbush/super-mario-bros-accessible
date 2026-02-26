@@ -171,7 +171,7 @@ def main():
             # --- Check HighPos ---
             0xA5, 0xB5,             # LDA Player_Y_HighPos
             0xC9, 0x02,             # CMP #$02
-            0xB0, 0x21,             # BCS deep_fall            (HighPos >= 2: backup)
+            0xB0, 0x30,             # BCS deep_fall            (HighPos >= 2: backup)
             0xC9, 0x01,             # CMP #$01
             0xD0, 0x37,             # BNE ExitCtrl             (HighPos == 0: above screen, exit)
             # --- HighPos == 1 (normal play area): check if falling ---
@@ -182,6 +182,9 @@ def main():
             0xA5, 0xCE,             # LDA Player_Y_Position
             0xC9, 0xC0,             # CMP #$C0
             0x90, 0x2B,             # BCC ExitCtrl             (above $C0: normal fall, exit)
+            # --- chk_injury: if i-frames active, hold instead of boost ---
+            0xAD, 0x9E, 0x07,       # LDA InjuryTimer ($079E)
+            0xD0, 0x11,             # BNE hold                 (i-frames active: hold position)
             # --- boost: zero sub-pixel, set velocity, fix gravity ---
             0xA9, 0x00,             # LDA #$00
             0x8D, 0x33, 0x04,       # STA Player_Y_MoveForce   (zero sub-pixel)
@@ -190,12 +193,18 @@ def main():
             0xA9, 0x70,             # LDA #$70
             0x8D, 0x0A, 0x07,       # STA VerticalForceDown    (set jump gravity, not walk-off gravity)
             0x4C, 0xBA, 0xB1,       # JMP ExitCtrl
+            # --- hold: during i-frames, freeze at $C0 with no velocity ---
+            0xA9, 0x00,             # LDA #$00
+            0x85, 0x9F,             # STA Player_Y_Speed       (zero velocity)
+            0xA9, 0xC0,             # LDA #$C0
+            0x85, 0xCE,             # STA Player_Y_Position    (hold at threshold)
+            0xD0, 0x0B,             # BNE ExitCtrl             (branch always: A=$C0 != 0)
             # --- deep_fall: backup for HighPos >= 2 ---
             0xA9, 0x01,             # LDA #$01
             0x85, 0xB5,             # STA Player_Y_HighPos     (back to play area)
             0xA9, 0xC0,             # LDA #$C0
             0x85, 0xCE,             # STA Player_Y_Position    (at threshold)
-            0x4C, 0x8F, 0xB1,       # JMP boost                (zero MoveForce + velocity + gravity)
+            0x4C, 0x8F, 0xB1,       # JMP chk_injury           (check i-frames before boost)
         ])
         nop_fill = bytes([0xEA] * (65 - len(new_code)))
         data = data[:0x3189] + new_code + nop_fill + data[0x31CA:]
