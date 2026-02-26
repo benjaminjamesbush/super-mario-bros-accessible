@@ -10,7 +10,7 @@ The original file is not modified — a new patched ROM is created.
 python patch_smb1_accessible.py "Super Mario Bros. (World).nes"
 ```
 
-Outputs a patched ROM with `- No Pits` appended to the filename.
+Outputs a patched ROM with `- Accessible` appended to the filename.
 
 ## What It Does
 

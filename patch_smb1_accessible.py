@@ -17,7 +17,7 @@ Game Genie codes:
 Usage:
     python patch_smb1_accessible.py "Super Mario Bros. (World).nes"
 
-The patched ROM is written alongside the original with " - No Pits" appended to the name.
+The patched ROM is written alongside the original with " - Accessible" appended to the name.
 The original ROM is not modified.
 """
 
@@ -124,9 +124,9 @@ def main():
         print(f"ERROR: ROM not found at {rom_path}")
         sys.exit(1)
 
-    # Build output path: insert " - No Pits" before extension
+    # Build output path: insert " - Accessible" before extension
     base, ext = os.path.splitext(rom_path)
-    output_path = f"{base} - No Pits{ext}"
+    output_path = f"{base} - Accessible{ext}"
 
     # Read ROM
     with open(rom_path, 'rb') as f:
