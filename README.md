@@ -12,6 +12,8 @@ But unmodified SMB1 doesn't let that experience happen. Bottomless pits and enem
 
 This patch removes those frustrations. Mario bounces out of pits instead of dying, the timer stays frozen, springboards always give a full boost, castle mazes solve themselves, and enemies become fun collectables that power Mario up on contact. He still runs, jumps, collects coins, enters pipes, and progresses through all 32 levels. The world is the same — it's just safe to explore.
 
+While there are many well-known Game Genie codes for Super Mario Bros., their effects can be unpredictable and frequently lead to soft locks. This patch has been extensively tested and iteratively refined to ensure a stable, playable experience across all 32 levels.
+
 Pairing the patched ROM with a device that has arcade-style controls — like the Powkiddy A13 — can further increase accessibility for players with fine motor control challenges. A full-sized joystick and large buttons are easier to use than a small d-pad and tiny face buttons.
 
 ## 🕹️ Usage
