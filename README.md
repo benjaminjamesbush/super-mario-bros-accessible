@@ -1,6 +1,6 @@
 # 🍄 SMB1 Accessibility Patch
 
-A Python script that patches **Super Mario Bros. (NES)** to make the game more accessible for special needs players. Bounces Mario out of pits instead of dying, freezes the timer, auto-solves castle mazes, and bakes in Game Genie codes for power-up-on-enemies and always-stay-big.
+A Python script that patches **Super Mario Bros. (NES)** to make the game more accessible for special needs players. Bounces Mario out of pits instead of dying, freezes the timer, maxes out springboards, auto-solves castle mazes, and bakes in Game Genie codes for power-up-on-enemies and always-stay-big.
 
 ## ❤️ Why This Exists
 
