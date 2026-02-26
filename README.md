@@ -4,6 +4,18 @@ A Python script that patches **Super Mario Bros. (NES)** to make the game more a
 
 The original file is not modified — a new patched ROM is created.
 
+## Why This Exists
+
+Players with intellectual disabilities face specific barriers when playing video games for the first time. Precise timing, instant-death hazards, complex puzzles, and time pressure all create frustration that disrupts the experience before it begins.
+
+Super Mario Bros. is an ideal base game for this audience. The controls are simple — a d-pad and two buttons. The visual language is clear and immediate. The levels progress linearly from left to right. It's universally recognized, runs on inexpensive retro handhelds, and the core mechanic — walk right, jump sometimes — is intuitive even for a first-time player.
+
+The ideal first experience for a player with intellectual disabilities is casual and exploratory: a simple walk to the right with occasional jumping, enjoying the graphics, the sound effects, the music, and the variety of different levels. For the general population this level of ease might feel boring, but for a first-time player with intellectual disabilities, it's exactly right. The goal is to make the game a pleasant, low-stress experience rather than a test of skill.
+
+Even with its simplicity, unmodified SMB1 has pain points for this audience. Bottomless pits cause instant death and force replaying large sections of a level. The countdown timer adds pressure. Springboards require precisely timed button presses. Castle mazes require memorization of correct paths. Enemies cause death, impede forward progress, and create frustration — every Goomba or Koopa is a potential interruption to the casual, exploratory experience the player needs.
+
+This patch removes those barriers while preserving the core experience. Mario still runs, jumps, collects coins, enters pipes, and progresses through all 32 levels. The world is the same — it's just safe to explore.
+
 ## Usage
 
 ```
