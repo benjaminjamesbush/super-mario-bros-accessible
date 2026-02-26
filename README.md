@@ -4,7 +4,7 @@ A Python script that patches **Super Mario Bros. (NES)** to make the game more a
 
 ## ❤️ Why This Exists
 
-Super Mario Bros. is one of the best games to hand to a first-time player with intellectual disabilities. The controls are a d-pad and two buttons. The levels go left to right. The visual language is clear — coins are good, pipes go somewhere, the flag at the end means you made it. It runs on inexpensive retro handhelds, and nearly everyone recognizes it.
+Super Mario Bros. is one of the best games to hand to a first-time player with intellectual disabilities. The controls are a d-pad and two buttons. The levels go left to right. The visual language is clear — coins are good, bricks break when you hit them, the flag at the end means you made it. It runs on inexpensive retro handhelds, and nearly everyone recognizes it.
 
 The ideal experience for this audience is casual and exploratory: walk to the right, jump sometimes, enjoy the music and the graphics and the variety of 32 different levels. Not a test of skill — just a pleasant walk through a colorful world.
 
