@@ -1,6 +1,6 @@
 # 🍄 SMB1 Accessibility Patch
 
-A Python script that patches **Super Mario Bros. (NES)** to make the game more accessible for special needs players. Bounces Mario out of pits instead of dying, freezes the timer, maxes out springboards, auto-solves castle mazes, and bakes in Game Genie codes for power-up-on-enemies and always-stay-big.
+A Python script that patches **Super Mario Bros. (NES)** to make the game more accessible for special needs players. Skips the title screen, bounces Mario out of pits instead of dying, freezes the timer, maxes out springboards, auto-solves castle mazes, and bakes in Game Genie codes for power-up-on-enemies and always-stay-big.
 
 ## ❤️ Why This Exists
 
@@ -10,7 +10,7 @@ The ideal experience for this audience is casual and exploratory: walk to the ri
 
 But unmodified SMB1 doesn't let that experience happen. Bottomless pits and enemies kill Mario and force the player to restart. The timer kills Mario after 400 ticks — a sudden death with no obvious visible cause. Springboards require precisely timed button presses. Castle mazes loop endlessly without the right path memorized. Each of these is a source of frustration. For a player with intellectual disabilities, that frustration can mean the difference between engagement and abandonment.
 
-This patch removes those frustrations. Mario bounces out of pits instead of dying, the timer stays frozen, springboards always give a full boost, castle mazes solve themselves, and enemies become fun collectables that power Mario up on contact. He still runs, jumps, collects coins, enters pipes, and progresses through all 32 levels. The world is the same — it's just safe to explore.
+This patch removes those frustrations. The title screen is skipped so gameplay begins immediately. Mario bounces out of pits instead of dying, the timer stays frozen, springboards always give a full boost, castle mazes solve themselves, and enemies become fun collectables that power Mario up on contact. He still runs, jumps, collects coins, enters pipes, and progresses through all 32 levels. The world is the same — it's just safe to explore.
 
 While there are many well-known Game Genie codes for Super Mario Bros., their effects can be unpredictable and frequently lead to soft locks. This patch has been extensively tested and iteratively refined to ensure a stable, playable experience across all 32 levels.
 
@@ -32,6 +32,7 @@ Outputs a patched ROM with `- Accessible` appended to the filename. The original
 | 2 | `$379F` | 3 bytes | Timer frozen (digit decrement NOPed) |
 | 3 | `$5EDF` | 1 byte | Springboard always gives max boost |
 | 4 | `$40FB` | 13 bytes | Castle maze auto-solved (4-4, 7-4 teleport; 8-4 pass-through) |
+| 5 | `$0255` | 3 bytes | Title screen skipped (gameplay starts immediately) |
 
 **Patch 1: Pit survival.** Safety net that replaces the original `PlayerHole` death routine with new 6502 code. Instead of dying when falling into a pit, Mario bounces out:
 
@@ -46,6 +47,8 @@ Outputs a patched ROM with `- Accessible` appended to the filename. The original
 **Patch 3: Springboard always max boost.** Changes the default `JumpspringForce` from `$F9` (low bounce) to `$F4` (max bounce). Every springboard gives a full boost regardless of button timing.
 
 **Patch 4: Castle maze auto-correct.** Worlds 4-4, 7-4, and 8-4 have branching paths where only one continues forward. Instead of checking Mario's Y-position against a lookup table, this patch loads the table value and checks if it's safe (< $C0). For 4-4 and 7-4 (table values $40/$80/$B0), Mario is teleported to the correct corridor. For 8-4 (table values $F0, which are below the floor), the teleport is skipped — the maze check still passes (no loopback), but Mario stays at his natural position.
+
+**Patch 5: Title screen skip.** The title screen mode runs four tasks in sequence: `InitializeGame` (clears RAM, sets up level data), `ScreenRoutines` (renders the title screen), `PrimaryGameSetup` (sets lives, enables screen), and `GameMenuRoutine` (waits for Start). This patch replaces the first three bytes of `GameMenuRoutine` with `JMP StartWorld1`, skipping the Start button wait and beginning gameplay immediately. All initialization from tasks 0–2 still runs. After game over, the cycle repeats and a new game auto-starts.
 
 ## 🧞 Game Genie Codes
 

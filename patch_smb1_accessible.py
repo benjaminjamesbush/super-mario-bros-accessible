@@ -9,6 +9,7 @@ Patches:
 2. Timer freeze: no time pressure
 3. Springboard always max boost: no precise timing needed
 4. Castle maze auto-correct: auto-solve 4-4, 7-4, 8-4 mazes
+5. Title screen skip: gameplay starts automatically
 
 Game Genie codes:
 - POAISA: Power up on enemies (touching enemies powers you up instead of hurting you)
@@ -322,6 +323,40 @@ def main():
         patches_failed += 1
 
     # ================================================================
+    # PATCH 5: Skip title screen
+    # ================================================================
+    print()
+    print("--- Patch 5: Skip title screen ---")
+    # TitleScreenMode runs 4 tasks in sequence via OperMode_Task:
+    #   0: InitializeGame   - clears RAM, sets up level data
+    #   1: ScreenRoutines   - renders title screen across ~15 frames
+    #   2: PrimaryGameSetup - sets lives, player size, enables screen
+    #   3: GameMenuRoutine  - waits for Start button, runs demo if idle
+    #
+    # GameMenuRoutine (CPU $8245, file $0255) reads joypad and waits for
+    # Start. When pressed, it jumps to StartWorld1 (CPU $82E3) which sets
+    # OperMode=1 (GameMode) and begins play.
+    #
+    # Patch: replace the first 3 bytes of GameMenuRoutine with JMP StartWorld1.
+    # StartWorld1 is at CPU $82E6 — NOT $82E3 which is inside ChkContinue's
+    # continue-game path (LDA ContinueWorld / JSR GoContinue). The BCC at
+    # $82DE that skips the continue path targets $82E6, confirming the address.
+    # Tasks 0-2 still run their full initialization; the title screen briefly
+    # flashes while ScreenRoutines renders, then gameplay starts automatically.
+    # Continue (A+Start) and player select are skipped — always 1-player from 1-1.
+    # After game over, the cycle repeats and auto-starts a new game.
+    #
+    # Context: A0 00 AD FC 06 0D FD 06
+    #   LDY #$00, LDA SavedJoypad1Bits, ORA SavedJoypad2Bits
+    if verify_context(data, 0x0255, bytes([0xA0, 0x00, 0xAD, 0xFC, 0x06, 0x0D, 0xFD, 0x06]),
+                       "GameMenuRoutine: LDY #$00, LDA SavedJoypad1Bits, ORA SavedJoypad2Bits"):
+        data = data[:0x0255] + bytes([0x4C, 0xE6, 0x82]) + data[0x0258:]
+        print(f"  OK: $0255-$0257: $A0 $00 $AD -> $4C $E6 $82  (JMP StartWorld1)")
+        patches_applied += 1
+    else:
+        patches_failed += 1
+
+    # ================================================================
     # GAME GENIE CODES
     # ================================================================
     print()
@@ -338,8 +373,8 @@ def main():
     # ================================================================
     print()
     print("=" * 60)
-    print(f"Patches applied: {patches_applied}/4")
-    print(f"Patches failed:  {patches_failed}/4")
+    print(f"Patches applied: {patches_applied}/5")
+    print(f"Patches failed:  {patches_failed}/5")
     print(f"Game Genie codes: {gg_applied}/4")
 
     if patches_applied == 0:
@@ -364,6 +399,7 @@ def main():
     print("  - Timer is frozen (no time pressure)")
     print("  - Springboard always gives max boost (no precise timing needed)")
     print("  - Castle mazes auto-corrected (Mario teleported to correct path in 4-4, 7-4, 8-4)")
+    print("  - Title screen skipped (gameplay starts automatically)")
     print("  - Touching enemies powers you up (POAISA)")
     print("  - Mario always stays big (OZTLLX + AATLGZ + SZLIVO)")
     print()
