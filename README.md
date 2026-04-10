@@ -12,6 +12,10 @@ But unmodified SMB1 doesn't let that experience happen. The very first barrier i
 
 This patch removes those frustrations. The title screen is skipped so gameplay begins immediately — promoting instant engagement the moment the game is launched. Mario bounces out of pits instead of dying, the timer stays frozen, springboards always give a full boost, castle mazes solve themselves, and enemies become fun collectables that power Mario up on contact. He still runs, jumps, collects coins, enters pipes, and progresses through all 32 levels. The world is the same — it's just safe to explore.
 
+<p align="center">
+  <img src="pit-bounce-16bit.png" alt="A character bouncing out of a pit" width="400">
+</p>
+
 While there are many well-known Game Genie codes for Super Mario Bros., their effects can be unpredictable and frequently lead to soft locks. This patch has been extensively tested and iteratively refined to ensure a stable, playable experience across all 32 levels.
 
 Pairing the patched ROM with a device that has arcade-style controls — like the Powkiddy A13 — can further increase accessibility for players with fine motor control challenges. A full-sized joystick and large buttons are easier to use than a small d-pad and tiny face buttons. The A13 can also be configured to boot directly into the patched ROM, creating a single-purpose device where gameplay starts the moment it powers on — no menus, no button prompts, no barriers.
